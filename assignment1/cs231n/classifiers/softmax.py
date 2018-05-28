@@ -1,6 +1,7 @@
 import numpy as np
 from random import shuffle
 from past.builtins import xrange
+import math
 
 def softmax_loss_naive(W, X, y, reg):
   """
@@ -30,7 +31,29 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  num_class = W.shape[1]
+  num_train = X.shape[0]
+  loss = 0.0
+  for i in xrange(num_train):
+    scores = np.exp(X[i].dot(W))
+    sum = scores.sum()
+    pk = scores / sum
+    margin = -np.log(pk)
+    loss += margin[y[i]]
+    for j in xrange(num_class):
+      df = 0.0
+      if j == y[i]:
+        df = pk[j] - 1
+      else:
+        df = pk[j]
+      dW[:,j] += df * X[i]
+
+  loss /= num_train
+  dW /= num_train
+
+  loss += 0.5 * reg * np.sum(W*W)
+  dW += reg * W
+
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -47,6 +70,7 @@ def softmax_loss_vectorized(W, X, y, reg):
   # Initialize the loss and gradient to zero.
   loss = 0.0
   dW = np.zeros_like(W)
+  num_train = X.shape[0]
 
   #############################################################################
   # TODO: Compute the softmax loss and its gradient using no explicit loops.  #
@@ -54,7 +78,19 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  scores = np.exp(np.dot(X, W))
+  probs = scores / np.sum(scores, axis=1, keepdims=True)
+  log_probs = -np.log(probs[range(num_train), y])
+  loss = np.sum(log_probs) / num_train + 0.5 * reg * np.sum(W*W)
+
+  dscores = probs
+  dscores[range(num_train), y] = -1
+  dscores /= num_train
+  dW = np.dot(X.T, dscores) + reg * W
+
+
+
+
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
