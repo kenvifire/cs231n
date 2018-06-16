@@ -191,7 +191,7 @@ class FullyConnectedNet(object):
             self.params['gamma1'] = np.ones(hidden_dims[0])
             self.params['beta1'] = np.zeros(hidden_dims[0])
         #
-        for i in range(len(hidden_dims) - 1):
+        for i in range(self.num_layers- 2):
             self.params['W'+str(i+2)] = np.random.normal(0.0, weight_scale, (hidden_dims[i], hidden_dims[i+1]))
             self.params['b'+str(i+2)] = np.zeros(hidden_dims[i+1])
 
@@ -199,7 +199,7 @@ class FullyConnectedNet(object):
                 self.params['gamma' + str(i+2)] = np.ones(hidden_dims[i+1])
                 self.params['beta' + str(i+2)] = np.zeros(hidden_dims[i+1])
 
-        self.params['W' + str(self.num_layers)] = np.random.normal(0.0, weight_scale, (hidden_dims[len(hidden_dims) - 1], num_classes))
+        self.params['W' + str(self.num_layers)] = np.random.normal(0.0, weight_scale, (hidden_dims[-1], num_classes))
         self.params['b' + str(self.num_layers)] = np.zeros(num_classes)
 
 
@@ -309,11 +309,13 @@ class FullyConnectedNet(object):
             loss += 0.5 * self.reg * np.sum(self.params['W' + str(i+1)] ** 2)
 
         # last affine
-        dout, grads['W' + str(self.num_layers)], grads['b' + str(self.num_layers)] = affine_backward(scores, cache['A' + str(self.num_layers)])
+        dout, grads['W' + str(self.num_layers)], grads['b' + str(self.num_layers)] = affine_backward(dout, cache['A' + str(self.num_layers)])
+        grads['W' + str(self.num_layers)] += self.reg * self.params['W' + str(self.num_layers)]
 
         # calculate by layer
-        for i in range(self.num_layers - 1):
-            index = str(self.num_layers - i - 1)
+        i = self.num_layers - 1
+        while i > 0:
+            index = str(i)
             if self.use_dropout:
                 dout = dropout_backward(dout, cache['D' + index])
             dout = relu_backward(dout, cache['R' + index])
@@ -321,7 +323,7 @@ class FullyConnectedNet(object):
                 dout, grads['gamma'+index], grads['beta'+index] = batchnorm_backward(dout, cache['B' + index])
             dout, grads['W' + index], grads['b' + index] = affine_backward(dout, cache['A' + index])
             grads['W' + index] += self.reg * self.params['W' + index]
-            grads['b' + index] = np.sum(dout)
+            i -= 1
 
 
         ############################################################################
