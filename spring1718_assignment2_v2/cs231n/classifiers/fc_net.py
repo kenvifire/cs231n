@@ -184,19 +184,24 @@ class FullyConnectedNet(object):
         # beta2, etc. Scale parameters should be initialized to ones and shift     #
         # parameters should be initialized to zeros.                               #
         ############################################################################
-        self.params['W1'] = weight_scale * np.random.randn(input_dim, hidden_dims[0])
-        self.params['b1'] = np.zeros(input_dim)
-        self.params['gamma1'] = np.ones(input_dim)
-        self.params['beta1'] = np.zeros(input_dim)
+        self.params['W1'] = np.random.normal(0.0, weight_scale, (input_dim, hidden_dims[0]))
+        self.params['b1'] = np.zeros(hidden_dims[0])
 
+        if self.normalization == 'batchnorm':
+            self.params['gamma1'] = np.ones(hidden_dims[0])
+            self.params['beta1'] = np.zeros(hidden_dims[0])
+        #
         for i in range(len(hidden_dims) - 1):
-            self.params['W'+str(i+2)] = weight_scale * np.random.randn(hidden_dims[i], hidden_dims[i+1])
-            self.params['b'+str(i+2)] = np.zeros(hidden_dims[i])
-            self.params['gamma' + str(i+2)] = np.ones(hidden_dims[i])
-            self.params['beta' + str(i+2)] = np.zeros(hidden_dims[i])
+            self.params['W'+str(i+2)] = np.random.normal(0.0, weight_scale, (hidden_dims[i], hidden_dims[i+1]))
+            self.params['b'+str(i+2)] = np.zeros(hidden_dims[i+1])
 
-        self.params['W' + str(self.num_layers)] = weight_scale * np.random.randn(hidden_dims[len(hidden_dims) - 1], num_classes)
-        self.params['b' + str(self.num_layers)] = np.zeros(hidden_dims[len(hidden_dims) - 1])
+            if self.normalization == 'batchnorm':
+                self.params['gamma' + str(i+2)] = np.ones(hidden_dims[i+1])
+                self.params['beta' + str(i+2)] = np.zeros(hidden_dims[i+1])
+
+        self.params['W' + str(self.num_layers)] = np.random.normal(0.0, weight_scale, (hidden_dims[len(hidden_dims) - 1], num_classes))
+        self.params['b' + str(self.num_layers)] = np.zeros(num_classes)
+
 
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -257,18 +262,24 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         out = X
+        cache = {}
+        num_layers = self.num_layers
         for i in range(self.num_layers - 1):
             index = str(i+1)
             #affine
-            out1, cache1 = affine_forward(X, self.params['W' + index], self.params['b' + index])
-            #batch
-            out2, cache2 = batchnorm_forward(out1, self.params['gamma' + index], self.params['beta' + index], self.bn_params[i])
+            out, cache['A' + index] = affine_forward(out, self.params['W' + index], self.params['b' + index])
+            if self.normalization == 'batchnorm':
+                #batch
+                out, cache['B' + index] = batchnorm_forward(out, self.params['gamma' + index],
+                                                         self.params['beta' + index],
+                                                         self.bn_params[i])
             #relu
-            out3 = relu_forward(out2)
+            out, cache['R' + index] = relu_forward(out)
             #dropout
-            out = dropout_forward(out3, self.dropout_param)
+            if self.use_dropout:
+                out, cache['D' + index] = dropout_forward(out, self.dropout_param)
 
-        out_last, cache_last = affine_forward(out, self.params['W' + str(self.num_layers)], self.params['b' + str(self.num_layers)])
+        out_last, cache['A' + str(num_layers)] = affine_forward(out, self.params['W' + str(num_layers)], self.params['b' + str(num_layers)])
 
         scores = out_last
         ############################################################################
@@ -293,11 +304,24 @@ class FullyConnectedNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        loss = softmax_loss(scores, y)
+        loss, dout = softmax_loss(scores, y)
         for i in range(self.num_layers):
-            loss += 0.5 * reg * np.sum(self.params['W' + str(i+1)] ** 2)
+            loss += 0.5 * self.reg * np.sum(self.params['W' + str(i+1)] ** 2)
 
+        # last affine
+        dout, grads['W' + str(self.num_layers)], grads['b' + str(self.num_layers)] = affine_backward(scores, cache['A' + str(self.num_layers)])
 
+        # calculate by layer
+        for i in range(self.num_layers - 1):
+            index = str(self.num_layers - i - 1)
+            if self.use_dropout:
+                dout = dropout_backward(dout, cache['D' + index])
+            dout = relu_backward(dout, cache['R' + index])
+            if self.normalization == 'batchnorm':
+                dout, grads['gamma'+index], grads['beta'+index] = batchnorm_backward(dout, cache['B' + index])
+            dout, grads['W' + index], grads['b' + index] = affine_backward(dout, cache['A' + index])
+            grads['W' + index] += self.reg * self.params['W' + index]
+            grads['b' + index] = np.sum(dout)
 
 
         ############################################################################
