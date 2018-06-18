@@ -187,7 +187,7 @@ class FullyConnectedNet(object):
         self.params['W1'] = np.random.normal(0.0, weight_scale, (input_dim, hidden_dims[0]))
         self.params['b1'] = np.zeros(hidden_dims[0])
 
-        if self.normalization == 'batchnorm':
+        if self.normalization == 'batchnorm' or self.normalization == 'layernorm':
             self.params['gamma1'] = np.ones(hidden_dims[0])
             self.params['beta1'] = np.zeros(hidden_dims[0])
         #
@@ -195,7 +195,7 @@ class FullyConnectedNet(object):
             self.params['W'+str(i+2)] = np.random.normal(0.0, weight_scale, (hidden_dims[i], hidden_dims[i+1]))
             self.params['b'+str(i+2)] = np.zeros(hidden_dims[i+1])
 
-            if self.normalization == 'batchnorm':
+            if self.normalization == 'batchnorm' or self.normalization == 'layernorm':
                 self.params['gamma' + str(i+2)] = np.ones(hidden_dims[i+1])
                 self.params['beta' + str(i+2)] = np.zeros(hidden_dims[i+1])
 
@@ -273,6 +273,11 @@ class FullyConnectedNet(object):
                 out, cache['B' + index] = batchnorm_forward(out, self.params['gamma' + index],
                                                          self.params['beta' + index],
                                                          self.bn_params[i])
+
+            elif self.normalization == 'layernorm':
+                out, cache['B' + index] = layernorm_forward(out, self.params['gamma' + index],
+                                                            self.params['beta' + index],
+                                                            self.bn_params[i])
             #relu
             out, cache['R' + index] = relu_forward(out)
             #dropout
@@ -319,8 +324,12 @@ class FullyConnectedNet(object):
             if self.use_dropout:
                 dout = dropout_backward(dout, cache['D' + index])
             dout = relu_backward(dout, cache['R' + index])
+
             if self.normalization == 'batchnorm':
                 dout, grads['gamma'+index], grads['beta'+index] = batchnorm_backward(dout, cache['B' + index])
+
+            elif self.normalization == 'layernorm':
+                dout, grads['gamma' + index], grads['beta' + index] = layernorm_backward(dout, cache['B' + index])
             dout, grads['W' + index], grads['b' + index] = affine_backward(dout, cache['A' + index])
             grads['W' + index] += self.reg * self.params['W' + index]
             i -= 1
@@ -331,3 +340,4 @@ class FullyConnectedNet(object):
         ############################################################################
 
         return loss, grads
+
