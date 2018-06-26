@@ -34,7 +34,10 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h   #
     # and cache variables respectively.                                          #
     ##############################################################################
-    pass
+    t = np.matmul(prev_h, Wh) + np.matmul(x, Wx) + b
+    next_h = np.tanh(t)
+    cache = (x, prev_h, Wx, Wh, b, t)
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -62,6 +65,15 @@ def rnn_step_backward(dnext_h, cache):
     #                                                                            #
     # HINT: For the tanh function, you can compute the local derivative in terms #
     # of the output value from tanh.                                             #
+
+    x, prev_h, Wx, Wh, b, t = cache
+    d_tanht = dnext_h * (1 - (np.tanh(t) ** 2))
+    dx = np.matmul(d_tanht, Wx.T)
+    dprev_h = np.matmul(d_tanht,  Wh.T)
+    dWx = np.matmul(x.T, d_tanht)
+    dWh = np.matmul(prev_h.T, d_tanht)
+    db = np.sum(d_tanht, axis=0)
+
     ##############################################################################
     pass
     ##############################################################################
@@ -94,7 +106,20 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # input data. You should use the rnn_step_forward function that you defined  #
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
-    pass
+    N, T, D = x.shape
+    _, H = h0.shape
+
+    prev_h = h0
+    h = np.zeros((T, N, H))
+
+    x_prime = np.transpose(x, (1, 0, 2))
+    for t in range(T):
+        x_t = x_prime[t, :, :]
+        next_h, cache_rnn_f = rnn_step_forward(x_t, prev_h, Wx, Wh, b)
+        prev_h = next_h
+        h[t] = next_h
+
+    h = np.transpose(h, (1, 0, 2))
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
