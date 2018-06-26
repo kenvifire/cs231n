@@ -2,3 +2,6 @@
 */.idea
 */.ipynb_checkpoints
 *.so
+*/*/datasets
+*/cs231n/datasets/
+*/cs231n/datasets/*
